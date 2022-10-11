@@ -5,7 +5,7 @@ import numpy as np
 from gym.envs import KG_env
 from gym.error import DependencyNotInstalled
 from learn2learn.gym.envs.meta_env import MetaEnv
-datapath = ....'nell-995'.....
+dataPath = ....'nell-995'.....
 class KG_task_env(MetaEnv,KG_env):
     def __init__(self, task_meta = None):
 	KG_Env.__init__(self,dataPath,train)
