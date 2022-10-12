@@ -3,7 +3,8 @@ import torch
 import torch.nn.functional as F
 import traceback
 from torch.autograd import grad
-
+from torch.distributions import Normal, Categorical
+from torch import optim
 from learn2learn.algorithms.base_learner import BaseLearner
 from learn2learn.utils import clone_module, update_module
 from learn2learn.algorithms.epg.losses import 
@@ -72,67 +73,70 @@ class GenericAgent(BaseLearner):
                  memory_out_size=None, 
                  inner_n_opt_steps=None, 
                  inner_opt_batch_size=None,
-                 module = None,
                  memory=None, 
-                 buffer_size=None):
+                 buffer_size = None,
+                 baselines = None,
+                 inner_actor_critic_model = None): #True
         assert inner_n_opt_steps is not None
         assert inner_opt_batch_size is not None
+        assert baselines is not None
       
         self.pi = None
         self._logstd = None
+        self.baselines = baselines
         self._use_mem = mem
         self._buffer_size=buffer_size
-
+        self.inner_actor_critic_model = inner_actor_critic_model 
         self.inner_n_opt_steps = inner_n_opt_steps
         self.inner_opt_batch_size = inner_opt_batch_size
-
+        
         self._mem_out_size = memory_out_size
         self._mem = Memory(64, self._mem_out_size)
 
         self.lst_rew_bonus_eval = [HashingBonusEvaluator(dim_key=128, obs_processed_flat_dim=env_dim)]
 
-        self._env_dim = env_dim
-        self._act_dim = act_dim
+        self._env_dim = observation_dim
+        self._act_dim = action_dim
 
         # obs_dim, act_dim, rew, aux, done, pi params
-        self._traj_in_dim = env_dim + act_dim + len(
+        self._traj_in_dim = observation_dim + action_dim + len(
             self.lst_rew_bonus_eval) + 2 + policy_output_params * act_dim + self._mem_out_size
 
         self._loss = Conv1DLoss(traj_dim_in=self._traj_in_dim)
-        self._traj_norm = Normalizer((env_dim + act_dim + len(self.lst_rew_bonus_eval) + 2,))
+        self._traj_norm = Normalizer((observation_dim + action_dim + len(self.lst_rew_bonus_eval) + 2,))
 
     @property
     def backprop_params(self):
         if self._use_mem:
-            if self._use_ppo:
-                return self._vf.train_vars + self._mem.train_vars
+            if self.inner_actor_critic_model:
+                return self.baselines.parameters + self._mem.parameters
             else:
-                return self._mem.train_vars
+                return self._mem.parameters
         else:
-            if self._use_ppo:
-                return self._vf.train_vars
+            if self.inner_actor_critic_model:
+                return self.baselines.parameters
             else:
                 return []
 
-    def _pi_f(self, x):
+    def pi_f(self, x):
         raise NotImplementedError #the policy network not the actual policy 
         #DiagNormal Policy is also a neural network with 2 layer MLP
         #becomes easier to implement as the gaussian policy is already defined
         ##only use this for the distribution of normalised trajectories
 
-    def _pi_logp(self, x, y):
+    def pilogpi(self, x, y):
         raise NotImplementedError ##use DiagNormal Policies functions 
 
     def kl(self, params0, params1):
         raise NotImplementedError
-
-    def _logp(self, params, acts):
+        
+    def logp(self, params, acts):
         raise NotImplementedError
+  
+    def critic_value(self, x):
+        return self.baselines.forward(x)
 
-    def _vf_f(self, x):
-        return self._vf.f(x)
-
-    def act(self, obs):
+    def action_sampled(self, obs):
         raise NotImplementedError
 
     def set_loss(self, loss):
@@ -141,26 +145,26 @@ class GenericAgent(BaseLearner):
     def get_loss(self):
         return self._loss
 
-    def _process_trajectory(self, traj):
-        proc_traj_in = F.concat(
+    def process_trajectory(self, traj):
+        proc_traj_in = torch.concat(
             [traj] + self._pi_f(traj[..., :self._env_dim]) + \
             [F.tile(self._mem.f(), (traj.shape[0], 1)).data],
             axis=1
         )
         return self._loss.process_trajectory(proc_traj_in)
 
-    def _compute_loss(self, traj, processed_traj):
+    def epg_surrogate_loss(self, traj, processed_traj):
         loss_inputs = [traj, processed_traj] + \
                       self._pi_f(traj[..., :self._env_dim]) + \
-                      [F.tile(self._mem.f(), (traj.shape[0], 1))]
-        loss_inputs = F.concat(loss_inputs, axis=1)
+                      [torch.tile(self._mem.f(), (traj.shape[0], 1))]
+        loss_inputs = torch.concat(loss_inputs, axis=1)
         epg_surr_loss = self._loss.loss(loss_inputs)
         return epg_surr_loss
 
     def _compute_ppo_loss(self, obs, acts, at, vt, old_params):
-        params = self._pi_f(obs)## no need for pi_f function directly take log_prob 
-        cv = F.flatten(self._vf_f(obs))
-        ratio = F.exp(self._logp(params, acts) - self._logp(old_params, acts)) ## we can directly get it from DiagNormal.log_prob
+        params = self.pi_f(obs)## no need for pi_f function directly take log_prob 
+        cv = F.flatten(self.baselines(obs))
+        ratio = F.exp(self.logp(params, acts) - self.logp(old_params, acts)) ## we can directly get it from DiagNormal.log_prob
         ## no need for pi_f function directly take log_prob 
         surr1 = ratio * at
         surr2 = F.clip(ratio, 1 - self._ppo_clipparam, 1 + self._ppo_clipparam) * at
@@ -171,7 +175,7 @@ class GenericAgent(BaseLearner):
         )
         return ppo_surr_loss
 
-    def update(self, obs, acts, rews, dones, ppo_factor, inner_opt_freq):
+    def epg_update(self, obs, acts, rews, dones, ppo_factor, inner_opt_freq):
 
         epg_rews = rews
         # Want to zero out rewards to the EPG loss function?
@@ -216,7 +220,7 @@ class GenericAgent(BaseLearner):
             at = (advs - advs.mean()) / advs.std()
 
         epg_surr_loss = 0.
-        pi_params_before = self._pi_f(_obs)
+        pi_params_before = self.pi_f(_obs)
         for _ in range(self.inner_n_opt_steps):
             for idx in np.array_split(np.random.permutation(n), n // self.inner_opt_batch_size):
                 # Clear gradients
@@ -255,35 +259,38 @@ class GenericAgent(BaseLearner):
 
 
 class ContinuousGenericAgent(GenericAgent):
-    def __init__(self, env_dim, act_dim, inner_lr=None, **kwargs):
+    def __init__(self,policy, env_dim, act_dim, inner_lr=None, **kwargs):
         assert inner_lr is not None
         super().__init__(env_dim, act_dim, 2, **kwargs)
-        self._pi = NN([env_dim] + list([64, 64]) + [act_dim], out_fn=lambda x: x)
-        self._logstd = C.Variable(np.zeros(act_dim, dtype=np.float32))
-        self._lst_adam = [Adam(var.shape, stepsize=inner_lr) for var in self.backprop_params]
+        self.pi = policy
+        ## sigma is defined internally within DiagNormalPolicy
+        ##self.lst_adam = [Adam(var.shape, stepsize=inner_lr) for var in self.backprop_params]
+        ##policy = DiagNormalPolicy(env.state_size, env.action_size)
+    ##meta_learner = l2l.algorithms.MetaSGD(policy, lr=meta_lr)
+    ##baseline = LinearValue(env.state_size, env.action_size)
+    ##opt = optim.Adam(meta_learner.parameters(), lr=meta_lr)
+    ##all_rewards = []
+    
+    ##we will define this externally
+
 
     @property
     def backprop_params(self):
         return super(ContinuousGenericAgent, self).backprop_params + self._pi.train_vars + [self._logstd]
 
-    def _pi_f(self, x):
-        return [self._pi.f(x), F.tile(self._logstd, (x.shape[0], 1))]
+    def pi_f(self, x):
+        mean,std = policy.prob_parameters(x)##already gives the standard deviation so no need of epsilon 
+        return mean,std
 
-    def _pi_logp(self, obs, acts):
-        mean, logstd = self._pi_f(obs)
-        return (
-                - 0.5 * np.log(2.0 * np.pi) * acts.shape[1]
-                - 0.5 * F.sum(F.square((acts - mean) / (F.exp(logstd)) + 1e-8), axis=1)
-                - F.sum(logstd, axis=1)
-        )
+    def pi_logp(self, obs, acts):
+        log_prob = policy.log_prob(obs,acts)
 
-    def _logp(self, params, acts):
+    def logp(self, params, acts):
         mean, logstd = params
-        return (
-                - 0.5 * np.log(2.0 * np.pi) * acts.shape[1]
-                - 0.5 * F.sum(F.square((acts - mean) / (F.exp(logstd)) + 1e-8), axis=1)
-                - F.sum(logstd, axis=1)
-        )
+        locs = mean
+        scale = torch.exp(torch.clamp(self.sigma, min=math.log(1e-8)))
+        distribution = Normal(locs = locs,scale = scale)
+        return distribution.log_prob(acts).mean(dim=1, keepdim=True)
 
     def act(self, obs):
         obs = obs.astype(np.float32)
