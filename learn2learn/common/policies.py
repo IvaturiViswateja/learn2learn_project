@@ -122,13 +122,6 @@ class CategoricalPolicy(nn.Module):
         self.mean = nn.Sequential(*layers)
         self.input_size = input_size
 
-    def forward(self, state):
-        state = ch.onehot(state, dim=self.input_size)
-        loc = self.mean(state)
-        density = Categorical(logits=loc)
-        action = density.sample()
-        log_prob = density.log_prob(action).mean().view(-1, 1).detach()
-        return action
     
         #use this for getting the parameters for normalised observations and trajectories
     
@@ -136,18 +129,15 @@ class CategoricalPolicy(nn.Module):
         state = ch.onehot(state, dim=self.input_size)
         loc = self.mean(state)
         density = Categorical(logits=loc)
-
         return density  
-      
-    
-    
-    def log_prob(self,state):
-        state = ch.onehot(state, dim=self.input_size)
-        loc = self.mean(state)
-        density = Categorical(logits=loc)
+   
+    def forward(self, state):
+        density = self.density(state)
         action = density.sample()
         log_prob = density.log_prob(action).mean().view(-1, 1).detach()
-        return log_prob
+        return action,log_prob   
+    
+  #use .forward for log_prob 
         
         
         
