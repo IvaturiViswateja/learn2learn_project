@@ -11,7 +11,40 @@ from learn2learn.algorithms.epg.networks import NN Memory
 from learn2learn.algorithms.epg.utils import 
 
 
+#import cherry 
+#import ppo 
+#compute losses and the policy parameters
+#feed in the base_epg_learner 
+#base epg learner expects the value function and policy functions as well
 
+#def compute_advantages(baseline, tau, gamma, rewards, dones, states, next_states):
+    # Update baseline
+    #returns = ch.td.discount(gamma, rewards, dones)
+    #baseline.fit(states, returns)
+    #values = baseline(states)
+    #next_values = baseline(next_states)
+    #bootstraps = values * (1.0 - dones) + next_values * dones
+    #next_value = torch.zeros(1, device=values.device)
+    #return ch.pg.generalized_advantage(tau=tau,
+                                       #gamma=gamma,
+                                       #rewards=rewards,
+                                       #dones=dones,
+                                       #values=bootstraps,
+                                       #next_value=next_value),gamma,rewards,dones,bootstraps
+
+
+#def maml_a2c_loss(train_episodes, learner, baseline, gamma, tau):
+    # Update policy and baseline
+   #states = train_episodes.state()
+    #actions = train_episodes.action()
+    #rewards = train_episodes.reward()
+    #dones = train_episodes.done()
+    #next_states = train_episodes.next_state()
+    #log_probs = learner.log_prob(states, actions)
+    #advantages = compute_advantages(baseline, tau, gamma, rewards,
+                                    #dones, states, next_states)
+    #advantages = ch.normalize(advantages).detach()
+    #return a2c.policy_loss(log_probs, advantages),log_probs
 
 
 
