@@ -1,3 +1,20 @@
+#!/usr/bin/env python3
+import torch 
+import torch.nn.functional as F
+import traceback
+from torch.autograd import grad
+
+from learn2learn.algorithms.base_learner import BaseLearner
+from learn2learn.utils import clone_module, update_module
+from learn2learn.algorithms.epg.losses import 
+from learn2learn.algorithms.epg.networks import NN Memory 
+from learn2learn.algorithms.epg.utils import 
+
+
+
+
+
+
 import chainer as C
 import chainer.functions as F
 import numpy as np
@@ -6,27 +23,26 @@ from mpi4py import MPI
 from epg.launching import logger
 from epg.exploration import HashingBonusEvaluator
 from epg.losses import Conv1DLoss
-from epg.networks import NN, Memory
+from epg.networks import Memory
 from epg.utils import sym_mean, gamma_expand, int_to_onehot, onehot_to_int, \
     Adam, Normalizer, gaussian_kl, categorical_kl
 
 
-class GenericAgent(object):
+class GenericAgent(BaseLearner):
     def __init__(self,
-                 env_dim, act_dim, policy_output_params,
-                 memory_out_size=None, inner_n_opt_steps=None, inner_opt_batch_size=None,
-                 inner_use_ppo=None, mem=None, buffer_size=None):
+                 env,
+                 env_dim, 
+                 act_dim, 
+                 policy_output_params,
+                 memory_out_size=None, 
+                 inner_n_opt_steps=None, 
+                 inner_opt_batch_size=None,
+                 module = None,
+                 memory=None, 
+                 buffer_size=None):
         assert inner_n_opt_steps is not None
         assert inner_opt_batch_size is not None
-        assert inner_use_ppo is not None
-        self._use_ppo = inner_use_ppo
-        if self._use_ppo:
-            self._ppo_gam = 0.99
-            self._ppo_lam = 0.95
-            self._ppo_klcoeff = 0.001
-            self._ppo_clipparam = 0.2
-            self._vf = NN([env_dim] + list([64, 64]) + [1], out_fn=lambda x: x)
-
+      
         self.pi = None
         self._logstd = None
         self._use_mem = mem
