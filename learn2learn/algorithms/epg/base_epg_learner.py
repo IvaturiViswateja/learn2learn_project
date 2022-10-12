@@ -9,6 +9,7 @@ from learn2learn.utils import clone_module, update_module
 from learn2learn.algorithms.epg.losses import 
 from learn2learn.algorithms.epg.networks import NN Memory 
 from learn2learn.algorithms.epg.utils import 
+from policies import DiagNormalPolicy,CategoricalPolicy
 
 
 #import cherry 
@@ -113,10 +114,13 @@ class GenericAgent(BaseLearner):
                 return []
 
     def _pi_f(self, x):
-        raise NotImplementedError
+        raise NotImplementedError #the policy network not the actual policy 
+        #DiagNormal Policy is also a neural network with 2 layer MLP
+        #becomes easier to implement as the gaussian policy is already defined
+        ##only use this for the distribution of normalised trajectories
 
     def _pi_logp(self, x, y):
-        raise NotImplementedError
+        raise NotImplementedError ##use DiagNormal Policies functions 
 
     def kl(self, params0, params1):
         raise NotImplementedError
@@ -153,9 +157,10 @@ class GenericAgent(BaseLearner):
         return epg_surr_loss
 
     def _compute_ppo_loss(self, obs, acts, at, vt, old_params):
-        params = self._pi_f(obs)
+        params = self._pi_f(obs)## no need for pi_f function directly take log_prob 
         cv = F.flatten(self._vf_f(obs))
-        ratio = F.exp(self._logp(params, acts) - self._logp(old_params, acts))
+        ratio = F.exp(self._logp(params, acts) - self._logp(old_params, acts)) ## we can directly get it from DiagNormal.log_prob
+        ## no need for pi_f function directly take log_prob 
         surr1 = ratio * at
         surr2 = F.clip(ratio, 1 - self._ppo_clipparam, 1 + self._ppo_clipparam) * at
         ppo_surr_loss = (
