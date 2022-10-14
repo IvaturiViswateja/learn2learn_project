@@ -64,7 +64,7 @@ from epg.utils import sym_mean, gamma_expand, int_to_onehot, onehot_to_int, \
     Adam, Normalizer, gaussian_kl, categorical_kl
 
 
-class GenericAgent(BaseLearner):
+class GenericAgent(object):
     def __init__(self,
                  env,
                  env_dim, 
