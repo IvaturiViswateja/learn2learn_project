@@ -213,6 +213,16 @@ class GenericAgent(object):
         obs = obs[-inner_opt_freq:]
         _obs = traj[-inner_opt_freq:, :obs.shape[1]]
         n = len(obs)
+        
+        
+        if self.inner_actor_critic_model:
+            old_params_sym = self._pi_f(_obs)
+            vp = np.ravel(self._vf_f(_obs).data)
+            old_params = [item.data for item in old_params_sym]
+            advs = gamma_expand(rews + self._ppo_gam * (1 - dones) * np.append(vp[1:], vp[-1]) - vp,
+                                self._ppo_gam * self._ppo_lam * (1 - dones))
+            vt = advs + vp
+            at = (advs - advs.mean()) / advs.std()
 
 
         epg_surr_loss = 0.
@@ -231,7 +241,15 @@ class GenericAgent(object):
                 epg_surr_loss += epg_surr_loss_sym.data
 
                
-                total_surr_loss = epg_surr_loss_sym * (1 - ppo_factor) + policy_loss * ppo_factor
+                
+                # Add bootstrapping signal if needed.
+                if self.inner_actor_critic_model:
+                    old_params_idx = [item[idx] for item in old_params]
+                    ppo_surr_loss = self._compute_ppo_loss(
+                        _obs[idx], acts[idx], at[idx], vt[idx], old_params_idx)
+                    total_surr_loss = epg_surr_loss_sym * (1 - ppo_factor) + ppo_surr_loss * ppo_factor
+                else:
+                    total_surr_loss = epg_surr_loss_sym
                
 
                 # Backward pass through loss function
