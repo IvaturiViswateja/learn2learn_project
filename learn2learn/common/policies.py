@@ -121,6 +121,12 @@ class CategoricalPolicy(nn.Module):
         layers.append(linear_init(nn.Linear(hiddens[-1], output_size)))
         self.mean = nn.Sequential(*layers)
         self.input_size = input_size
+        
+        
+    def prob_params(self, state):
+        state = state.to(self.device, non_blocking=True)
+        pi_mu = self.mean(state)
+        return pi_mu
 
     
         #use this for getting the parameters for normalised observations and trajectories
@@ -135,7 +141,7 @@ class CategoricalPolicy(nn.Module):
         density = self.density(state)
         action = density.sample()
         log_prob = density.log_prob(action).mean().view(-1, 1).detach()
-        return action,log_prob   
+        return log_prob,action   
     
   #use .forward for log_prob 
         
