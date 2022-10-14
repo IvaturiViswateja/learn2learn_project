@@ -7,27 +7,9 @@ from torch import optim
 
 
 
-import chainer as C
-import chainer.functions as F
-import numpy as np
 
 
-    def set_params_1d(self, params):
-        """Set params for ES (theta)
-        """
-        n = self._lst_w + self._lst_b
-        idx = 0
-        for e in n:
-            e.data[...] = params[idx:idx + e.size].reshape(e.shape)
-            idx += e.size
-
-    def get_params_1d(self):
-        """Get params for ES (theta)
-        """
-        n = self._lst_w + self._lst_b
-        return np.concatenate([e.data.flatten() for e in n])
-
-
+#convert this to pytorch linear model
 class Memory(object):
     """Linear memory, allows storing information in its weights.
     """
@@ -48,3 +30,28 @@ class Memory(object):
         x = np.ones(self._w.shape[1], dtype=np.float32)[np.newaxis, :]
         # Needs nonlinearity after memory
         return F.tanh(F.linear(x, self._w, self._b))
+class Memory(object):
+    """Linear memory, allows storing information in its weights.
+    """
+    def __init__(self, input_size, output_size, hiddens=None, activation='tanh', device='cpu'):
+        super(Memory, self).__init__()
+        self.device = device
+        if hiddens is None:
+            hiddens = [64]
+        if activation == 'relu':
+            activation = nn.ReLU
+        elif activation == 'tanh':
+            activation = nn.Tanh
+        layers = [linear_init(nn.Linear(input_size, hiddens[0])), activation()]
+        for i, o in zip(hiddens[:-1], hiddens[1:]):
+            layers.append(linear_init(nn.Linear(i, o)))
+            layers.append(activation())
+        layers.append(linear_init(nn.Linear(hiddens[-1], output_size)))
+        self.memory = nn.Sequential(*layers)
+        
+     def forward(self,x)
+         input = x
+         memory = self.memory(x)
+         return memory 
+        
+       
