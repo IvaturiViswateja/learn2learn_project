@@ -106,6 +106,29 @@ class DiagNormalPolicy(nn.Module):
         density = self.density(state)
         action = density.sample()
         return action
+        def forward(self, state):
+        density = self.density(state)
+        action = density.sample()
+        log_prob = density.log_prob(action).mean().view(-1, 1).detach()
+        return log_prob,action
+    
+    def set_params_1d(self, params):
+        """Set params for ES (theta)
+        """
+        model = self.mean()
+        n = model.parameters()
+        idx = 0
+        for e in n:
+            e.detach() = params[idx:idx + e.size].reshape(e.shape)
+            idx += e.size
+            
+    def get_params_1d(self):
+        """Get params for ES (theta)
+        """
+        model = self.mean()
+        n = model.parameters()
+        return np.concatenate([torch.flatten(e.detach()) for e in n])
+
 
 
 class CategoricalPolicy(nn.Module):
@@ -141,8 +164,24 @@ class CategoricalPolicy(nn.Module):
         density = self.density(state)
         action = density.sample()
         log_prob = density.log_prob(action).mean().view(-1, 1).detach()
-        return log_prob,action   
+        return log_prob,action
     
+    def set_params_1d(self, params):
+        """Set params for ES (theta)
+        """
+        model = self.mean()
+        n = model.parameters()
+        idx = 0
+        for e in n:
+            e.detach() = params[idx:idx + e.size].reshape(e.shape)
+            idx += e.size
+
+    def get_params_1d(self):
+        """Get params for ES (theta)
+        """
+        model = self.mean()
+        n = model.parameters()
+        return np.concatenate([torch.flatten(e.detach()) for e in n])
   #use .forward for log_prob 
         
         
