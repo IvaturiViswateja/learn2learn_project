@@ -8,7 +8,7 @@ from torch import optim
 from learn2learn.algorithms.base_learner import BaseLearner
 from learn2learn.utils import clone_module, update_module
 from learn2learn.algorithms.epg.losses import 
-from learn2learn.algorithms.epg.networks import NN Memory 
+from learn2learn.algorithms.epg.networks import Memory 
 from learn2learn.algorithms.epg.utils import 
 from learn2learn.algorithms.common.policies import DiagNormalPolicy,CategoricalPolicy
 ## these are neural networks which gives the required policies 
