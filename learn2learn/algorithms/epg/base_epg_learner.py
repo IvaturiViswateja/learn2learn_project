@@ -165,7 +165,7 @@ class GenericAgent(BaseLearner):
         epg_surr_loss = self._loss.loss(loss_inputs)
         return epg_surr_loss
 
-     def _compute_ppo_loss(self, obs, acts, at, vt, old_params):
+     def compute_ppo_loss(self, obs, acts, at, vt, old_params):
         params = self.pi_f(obs)
         critic_value = F.flatten(self.critic_value(obs))
         ratio = torch.exp(self._logp(params, acts) - self._logp(old_params, acts))
@@ -176,7 +176,7 @@ class GenericAgent(BaseLearner):
                 + self._ppo_klcoeff * sym_mean(self.kl(old_params, params))
                 + sym_mean(F.square(cv - vt))
         )
-        return ppo_surr_loss
+        return policy_loss
 
 
     def epg_update(self, obs, acts, rews, dones, ppo_factor, inner_opt_freq):
