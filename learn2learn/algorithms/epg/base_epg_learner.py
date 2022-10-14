@@ -78,10 +78,12 @@ class GenericAgent(BaseLearner):
                  baselines = None,
                  policy_loss = None,
                  policy = None,
+                 inner_optim = None,
                  inner_actor_critic_model = None): #True
         assert inner_n_opt_steps is not None
         assert inner_opt_batch_size is not None
         assert baselines is not None
+        assert inner_optim is not None
         self.policy_loss = policy_loss
         self.pi = policy
         self._logstd = None
@@ -91,7 +93,8 @@ class GenericAgent(BaseLearner):
         self.inner_actor_critic_model = inner_actor_critic_model 
         self.inner_n_opt_steps = inner_n_opt_steps
         self.inner_opt_batch_size = inner_opt_batch_size
-        
+        self.inner_optim = inner_optim 
+        # define inner_optim = optim.Adam(net.parameters(), lr=0.001, momentum=0.9) outside e
         self._mem_out_size = memory_out_size
         self._mem = Memory(64, self._mem_out_size)
 
@@ -207,7 +210,7 @@ class GenericAgent(BaseLearner):
             for idx in np.array_split(np.random.permutation(n), n // self.inner_opt_batch_size):
                 # Clear gradients
                 for v in self.backprop_params:
-                    v.cleargrad()
+                    optimizer.zero_grad()
 
                 # Forward pass through loss function.
                 # Apply temporal conv to input trajectory
@@ -223,7 +226,7 @@ class GenericAgent(BaseLearner):
                 # Backward pass through loss function
                 ## find how to do backward pass in pytorch method 
                 total_surr_loss.backward()
-                for v, adam in zip(self.backprop_params, self._lst_adam):
+                for v ,adam in zip(self.backprop_params,self.inner_optim):
                     if np.isnan(v.grad).any() or np.isinf(v.grad).any():
                         logger.log(
                             "WARNING: gradient update nan on node {}".format(MPI.COMM_WORLD.Get_rank()))
