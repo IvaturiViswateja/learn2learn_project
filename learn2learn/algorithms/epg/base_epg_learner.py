@@ -76,7 +76,6 @@ class GenericAgent(BaseLearner):
                  memory=None, 
                  buffer_size = None,
                  baselines = None,
-                 policy_loss = None,
                  policy = None,
                  inner_optim = None,
                  inner_actor_critic_model = None): #True
@@ -84,7 +83,7 @@ class GenericAgent(BaseLearner):
         assert inner_opt_batch_size is not None
         assert baselines is not None
         assert inner_optim is not None
-        self.policy_loss = policy_loss
+        
         self.pi = policy
         self._logstd = None
         self.baselines = baselines
@@ -160,15 +159,27 @@ class GenericAgent(BaseLearner):
 
     def epg_surrogate_loss(self, traj, processed_traj):
         loss_inputs = [traj, processed_traj] + \
-                      self._pi_f(traj[..., :self._env_dim]) + \
+                      self.pi_f(traj[..., :self._env_dim]) + \
                       [torch.tile(self._mem.f(), (traj.shape[0], 1))]
         loss_inputs = torch.concat(loss_inputs, axis=1)
         epg_surr_loss = self._loss.loss(loss_inputs)
         return epg_surr_loss
 
-    
+     def _compute_ppo_loss(self, obs, acts, at, vt, old_params):
+        params = self.pi_f(obs)
+        critic_value = F.flatten(self.critic_value(obs))
+        ratio = torch.exp(self._logp(params, acts) - self._logp(old_params, acts))
+        surr1 = ratio * at
+        surr2 = torch.clip(ratio, 1 - self._ppo_clipparam, 1 + self._ppo_clipparam) * at
+        ppo_surr_loss = (
+                -sym_mean(torch.minimum(surr1, surr2))
+                + self._ppo_klcoeff * sym_mean(self.kl(old_params, params))
+                + sym_mean(F.square(cv - vt))
+        )
+        return ppo_surr_loss
 
-    def epg_update(self, obs, acts, rews, dones, ppo_factor, inner_opt_freq, policy_loss):
+
+    def epg_update(self, obs, acts, rews, dones, ppo_factor, inner_opt_freq):
 
         epg_rews = rews
         # Want to zero out rewards to the EPG loss function?
