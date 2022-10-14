@@ -76,12 +76,14 @@ class GenericAgent(BaseLearner):
                  memory=None, 
                  buffer_size = None,
                  baselines = None,
+                 policy_loss = None,
+                 policy = None,
                  inner_actor_critic_model = None): #True
         assert inner_n_opt_steps is not None
         assert inner_opt_batch_size is not None
         assert baselines is not None
-      
-        self.pi = None
+        self.policy_loss = policy_loss
+        self.pi = policy
         self._logstd = None
         self.baselines = baselines
         self._use_mem = mem
@@ -161,21 +163,9 @@ class GenericAgent(BaseLearner):
         epg_surr_loss = self._loss.loss(loss_inputs)
         return epg_surr_loss
 
-    def _compute_ppo_loss(self, obs, acts, at, vt, old_params):
-        params = self.pi_f(obs)## no need for pi_f function directly take log_prob 
-        cv = F.flatten(self.baselines(obs))
-        ratio = F.exp(self.logp(params, acts) - self.logp(old_params, acts)) ## we can directly get it from DiagNormal.log_prob
-        ## no need for pi_f function directly take log_prob 
-        surr1 = ratio * at
-        surr2 = F.clip(ratio, 1 - self._ppo_clipparam, 1 + self._ppo_clipparam) * at
-        ppo_surr_loss = (
-                -sym_mean(F.minimum(surr1, surr2))
-                + self._ppo_klcoeff * sym_mean(self.kl(old_params, params))
-                + sym_mean(F.square(cv - vt))
-        )
-        return ppo_surr_loss
+    
 
-    def epg_update(self, obs, acts, rews, dones, ppo_factor, inner_opt_freq):
+    def epg_update(self, obs, acts, rews, dones, ppo_factor, inner_opt_freq, policy_loss):
 
         epg_rews = rews
         # Want to zero out rewards to the EPG loss function?
@@ -210,14 +200,6 @@ class GenericAgent(BaseLearner):
         _obs = traj[-inner_opt_freq:, :obs.shape[1]]
         n = len(obs)
 
-        if self._use_ppo:
-            old_params_sym = self._pi_f(_obs)
-            vp = np.ravel(self._vf_f(_obs).data)
-            old_params = [item.data for item in old_params_sym]
-            advs = gamma_expand(rews + self._ppo_gam * (1 - dones) * np.append(vp[1:], vp[-1]) - vp,
-                                self._ppo_gam * self._ppo_lam * (1 - dones))
-            vt = advs + vp
-            at = (advs - advs.mean()) / advs.std()
 
         epg_surr_loss = 0.
         pi_params_before = self.pi_f(_obs)
@@ -234,16 +216,12 @@ class GenericAgent(BaseLearner):
                 epg_surr_loss_sym = self._compute_loss(traj[idx], processed_traj[idx])
                 epg_surr_loss += epg_surr_loss_sym.data
 
-                # Add bootstrapping signal if needed.
-                if self._use_ppo:
-                    old_params_idx = [item[idx] for item in old_params]
-                    ppo_surr_loss = self._compute_ppo_loss(
-                        _obs[idx], acts[idx], at[idx], vt[idx], old_params_idx)
-                    total_surr_loss = epg_surr_loss_sym * (1 - ppo_factor) + ppo_surr_loss * ppo_factor
-                else:
-                    total_surr_loss = epg_surr_loss_sym
+               
+                total_surr_loss = epg_surr_loss_sym * (1 - ppo_factor) + policy_loss * ppo_factor
+               
 
                 # Backward pass through loss function
+                ## find how to do backward pass in pytorch method 
                 total_surr_loss.backward()
                 for v, adam in zip(self.backprop_params, self._lst_adam):
                     if np.isnan(v.grad).any() or np.isinf(v.grad).any():
@@ -252,7 +230,7 @@ class GenericAgent(BaseLearner):
                     else:
                         v.data += adam.step(v.grad)
 
-        pi_params_after = self._pi_f(_obs)
+        pi_params_after = self.pi_f(_obs)
 
         return epg_surr_loss / (n // self.inner_opt_batch_size) / self.inner_n_opt_steps, \
                np.mean(self.kl(pi_params_before, pi_params_after).data)
@@ -317,32 +295,31 @@ class ContinuousGenericAgent(GenericAgent):
 
 
 class DiscreteGenericAgent(GenericAgent):
-    def __init__(self, env_dim, act_dim, inner_lr=None, **kwargs):
+    def __init__(self, env_dim, act_dim, policy inner_lr=None, **kwargs):
         assert inner_lr is not None
+        assert policy = CategoricalPolicy
         super().__init__(env_dim, act_dim, 1, **kwargs)
-        self.pi = NN([env_dim] + list([64, 64]) + [act_dim], out_fn=F.softmax)
-        self._lst_adam = [Adam(var.shape, stepsize=inner_lr) for var in self.backprop_params]
+        self.pi = policy ## take categorical Policy
+         ## select optimizer outside for policy
 
-    @staticmethod
-    def cat_sample(prob_matrix):
-        s = np.cumsum(prob_matrix, axis=1)[:, :-1]
-        r = np.random.rand(prob_matrix.shape[0])
-        return (s < r).sum(axis=1)
-
+ 
+##fina hoe to do backpropagation in pytorch format 
     @property
     def backprop_params(self):
         return super(DiscreteGenericAgent, self).backprop_params + self.pi.train_vars
 
-    def _pi_f(self, x):
-        return [self.pi.f(x)]
+    def pi_f(self, x):
+        return policy.prob_parameters(x)
 
-    def _pi_logp(self, obs, acts):
-        prob = F.sum(self._pi_f(obs)[0] * acts, axis=1)
-        return F.log(prob)
+    def pi_logp(self, obs, acts):
+        log_prob,actions = policy.forward(obs)
+        return log_prob
 
-    def _logp(self, params, acts):
-        prob = F.sum(params[0] * acts, axis=1)
-        return F.log(prob)
+    def logp(self, params, acts):
+        loc = params[0]
+        density = Categorical(logits=loc)
+        log_prob = density.log_prob(action).mean().view(-1, 1).detach()
+        return log_prob
 
     def act(self, obs):
         obs = obs.astype(np.float32)
