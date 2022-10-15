@@ -338,7 +338,7 @@ class DiscreteGenericAgent(GenericAgent):
 ##fina hoe to do backpropagation in pytorch format 
     @property
     def backprop_params(self):
-        return super(DiscreteGenericAgent, self).backprop_params + self.pi.train_vars
+        return super(DiscreteGenericAgent, self).backprop_params + self.pi.parameters()
 
     def pi_f(self, x):
         return policy.prob_parameters(x)
