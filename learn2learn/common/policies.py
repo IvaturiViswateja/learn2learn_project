@@ -119,7 +119,7 @@ class DiagNormalPolicy(nn.Module):
         n = model.parameters()
         idx = 0
         for e in n:
-            e.detach() = params[idx:idx + e.size].reshape(e.shape)
+            e = params[idx:idx + e.size].reshape(e.shape).
             idx += e.size
             
     def get_params_1d(self):
@@ -173,7 +173,8 @@ class CategoricalPolicy(nn.Module):
         n = model.parameters()
         idx = 0
         for e in n:
-            e.detach() = params[idx:idx + e.size].reshape(e.shape)
+            temp = params[idx:idx + e.size].reshape(e.shape)
+            e = temp.detach()
             idx += e.size
 
     def get_params_1d(self):
