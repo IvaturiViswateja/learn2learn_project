@@ -29,7 +29,7 @@ class ES(object):
     """Evolution Strategies (ES)
     """
 
-    def __init__(self, inner_opt_freq=None, inner_max_n_epoch=None, inner_opt_batch_size=None,
+    def __init__(self,env, inner_opt_freq=None, inner_max_n_epoch=None, inner_opt_batch_size=None,
                  inner_buffer_size=None, inner_n_opt_steps=None, inner_lr=None, inner_use_ppo=None,
                  plot_freq=10, gpi=None, mem=None, **_):
       
@@ -57,10 +57,16 @@ class ES(object):
         else:
             agent_cls = ContinuousGenericAgent
         agent = agent_cls(
-            env_dim, act_dim, memory_out_size=self._inner_mem_out_size,
-            inner_n_opt_steps=self._inner_n_opt_steps,
-            inner_opt_batch_size=self._inner_opt_batch_size, inner_lr=self._inner_lr,
-            inner_use_ppo=self._inner_use_ppo, mem=self._inner_use_mem, buffer_size=self._inner_buffer_size)
+                 policy_output_params,
+                 memory_out_size=None, 
+                 inner_n_opt_steps=None, 
+                 inner_opt_batch_size=None,
+                 memory=None, 
+                 buffer_size = None,
+                 baselines = None,
+                 policy = None,
+                 inner_optim = None,
+                 inner_actor_critic_model = None)
         return agent
 
     def init_theta(self, env):
