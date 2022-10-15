@@ -1,5 +1,6 @@
 import matplotlib
-
+import torch 
+from torch import optim
 matplotlib.use('Agg')
 import os
 import gym
@@ -28,12 +29,11 @@ class ES(object):
     """Evolution Strategies (ES)
     """
 
-    def __init__(self, env, env_id, inner_opt_freq=None, inner_max_n_epoch=None, inner_opt_batch_size=None,
+    def __init__(self, inner_opt_freq=None, inner_max_n_epoch=None, inner_opt_batch_size=None,
                  inner_buffer_size=None, inner_n_opt_steps=None, inner_lr=None, inner_use_ppo=None,
                  plot_freq=10, gpi=None, mem=None, **_):
-        self._env = env
-        self._env_id = env_id
-
+      
+        
         self._outer_plot_freq = plot_freq
         self._outer_evolve_policy_init = gpi
 
@@ -144,7 +144,7 @@ class ES(object):
         logger.log('Theta dim: {}'.format(num_params))
 
         # Set up outer loop parameter update schedule.
-        adam = Adam(shape=(num_params,), beta1=0., stepsize=outer_learning_rate, dtype=np.float32)
+        adam = optim.Adam(theta, betas=(0,0), lr=outer_learning_rate)
 
         # Set up intra-machine parallelization.
         logger.log('Using {} proceses per MPI process.'.format(n_cpu))
