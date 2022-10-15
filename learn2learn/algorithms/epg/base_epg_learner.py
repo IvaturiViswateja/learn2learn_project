@@ -65,10 +65,7 @@ from epg.utils import sym_mean, gamma_expand, int_to_onehot, onehot_to_int, \
 
 
 class GenericAgent(object):
-    def __init__(self,
-                 env,
-                 env_dim, 
-                 act_dim, 
+    def __init__(self, 
                  policy_output_params,
                  memory_out_size=None, 
                  inner_n_opt_steps=None, 
