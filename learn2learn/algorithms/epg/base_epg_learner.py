@@ -324,7 +324,7 @@ class ContinuousGenericAgent(GenericAgent):
 
 
 class DiscreteGenericAgent(GenericAgent):
-    def __init__(self, env_dim, act_dim, policy inner_lr=None, **kwargs):
+    def __init__(self, env_dim, act_dim, policy, inner_lr=None, **kwargs):
         assert inner_lr is not None
         assert policy = CategoricalPolicy
         super().__init__(env_dim, act_dim, 1, **kwargs)
@@ -358,8 +358,9 @@ class DiscreteGenericAgent(GenericAgent):
 
         # Normalize!
         obs = self._traj_norm.norm(traj)[:self._env_dim]
-        prob = self.pi.f(obs[np.newaxis, ...]).data
-        return int_to_onehot(self.cat_sample(prob)[0], self._act_dim)
+        prob = self.pi_f(obs[np.newaxis,]).detach()
+        log_prob,actions = policy.forward(obs[np.newaxis,])
+        return actions
 
     def kl(self, params0, params1):
         return categorical_kl(params0, params1)
