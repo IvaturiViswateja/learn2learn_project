@@ -1,6 +1,5 @@
 import random
 import time
-
 import chainer.functions as F
 import gym
 import numpy as np
