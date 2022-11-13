@@ -1,21 +1,18 @@
 #!/usr/bin/env python3
 
 import math
-
+import numpy as np
 import cherry as ch
 import torch
 from torch import nn
 from torch.distributions import Normal, Categorical
 
 EPSILON = 1e-6
-
-
 def linear_init(module):
     if isinstance(module, nn.Linear):
         nn.init.xavier_uniform_(module.weight)
         module.bias.data.zero_()
     return module
-
 
 class CaviaDiagNormalPolicy(nn.Module):
 
@@ -106,7 +103,8 @@ class DiagNormalPolicy(nn.Module):
         density = self.density(state)
         action = density.sample()
         return action
-        def forward(self, state):
+    
+    def forward(self, state):
         density = self.density(state)
         action = density.sample()
         log_prob = density.log_prob(action).mean().view(-1, 1).detach()
@@ -119,7 +117,7 @@ class DiagNormalPolicy(nn.Module):
         n = model.parameters()
         idx = 0
         for e in n:
-            e = params[idx:idx + e.size].reshape(e.shape).
+            e = params[idx:idx + e.size].reshape(e.shape)
             idx += e.size
             
     def get_params_1d(self):
@@ -128,8 +126,6 @@ class DiagNormalPolicy(nn.Module):
         model = self.mean()
         n = model.parameters()
         return np.concatenate([torch.flatten(e.detach()) for e in n])
-
-
 
 class CategoricalPolicy(nn.Module):
 
@@ -150,9 +146,8 @@ class CategoricalPolicy(nn.Module):
         state = state.to(self.device, non_blocking=True)
         pi_mu = self.mean(state)
         return pi_mu
-
     
-        #use this for getting the parameters for normalised observations and trajectories
+    #use this for getting the parameters for normalised observations and trajectories
     
     def density(self, state):
         state = ch.onehot(state, dim=self.input_size)

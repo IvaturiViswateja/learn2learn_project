@@ -1,18 +1,30 @@
 #!/usr/bin/env python3
+import math
 import torch 
 import torch.nn.functional as F
 import traceback
 from torch.autograd import grad
 from torch.distributions import Normal, Categorical
 from torch import optim
+import chainer as C
+import chainer.functions as F
+import numpy as np
+from mpi4py import MPI
+from epg.launching import logger
+from epg.exploration import HashingBonusEvaluator
+from epg.losses import Conv1DLoss
+from epg.networks import Memory
+from epg.utils import sym_mean, gamma_expand, int_to_onehot, onehot_to_int, \
+    Adam, Normalizer, gaussian_kl, categorical_kl
 from learn2learn.algorithms.base_learner import BaseLearner
 from learn2learn.utils import clone_module, update_module
-from learn2learn.algorithms.epg.losses import 
+from learn2learn.algorithms.epg.losses import *
 from learn2learn.algorithms.epg.networks import Memory 
-from learn2learn.algorithms.epg.utils import 
-from learn2learn.algorithms.common.policies import DiagNormalPolicy,CategoricalPolicy
-## these are neural networks which gives the required policies 
+from learn2learn.algorithms.epg.utils import *
+from learn2learn.common.policies import DiagNormalPolicy,CategoricalPolicy
+from learn2learn.gym.envs.Knowledge_graphs import KG_task_env
 
+## these are neural networks which gives the required policies 
 
 #import cherry 
 #import ppo 
@@ -35,7 +47,6 @@ from learn2learn.algorithms.common.policies import DiagNormalPolicy,CategoricalP
                                        #values=bootstraps,
                                        #next_value=next_value),gamma,rewards,dones,bootstraps
 
-
 #def maml_a2c_loss(train_episodes, learner, baseline, gamma, tau):
     # Update policy and baseline
    #states = train_episodes.state()
@@ -50,21 +61,7 @@ from learn2learn.algorithms.common.policies import DiagNormalPolicy,CategoricalP
     #return a2c.policy_loss(log_probs, advantages),log_probs
 
 
-
-import chainer as C
-import chainer.functions as F
-import numpy as np
-from mpi4py import MPI
-
-from epg.launching import logger
-from epg.exploration import HashingBonusEvaluator
-from epg.losses import Conv1DLoss
-from epg.networks import Memory
-from epg.utils import sym_mean, gamma_expand, int_to_onehot, onehot_to_int, \
-    Adam, Normalizer, gaussian_kl, categorical_kl
-
-
-class GenericAgent(object):
+class GenericAgent(KG_task_env):
     def __init__(self, 
                  policy_output_params,
                  memory_out_size=None, 
@@ -84,7 +81,7 @@ class GenericAgent(object):
         self.pi = policy
         self._logstd = None
         self.baselines = baselines
-        self._use_mem = mem
+        self._use_mem = memory
         self._buffer_size=buffer_size
         self.inner_actor_critic_model = inner_actor_critic_model 
         self.inner_n_opt_steps = inner_n_opt_steps
@@ -94,17 +91,20 @@ class GenericAgent(object):
         self._mem_out_size = memory_out_size
         self._mem = Memory(64, self._mem_out_size)
 
-        self.lst_rew_bonus_eval = [HashingBonusEvaluator(dim_key=128, obs_processed_flat_dim=env_dim)]
+        self.lst_rew_bonus_eval = [HashingBonusEvaluator(dim_key=128, obs_processed_flat_dim=np.ndim(KG_task_env.observation_space))]
 
-        self._env_dim = observation_dim
-        self._act_dim = action_dim
+        # self._env_dim = observation_dim
+        self._env_dim = np.ndim(KG_task_env.observation_space)
+        # self._act_dim = action_dim
+        self._act_dim = np.ndim(KG_task_env.action_space)
+# 
 
         # obs_dim, act_dim, rew, aux, done, pi params
-        self._traj_in_dim = observation_dim + action_dim + len(
-            self.lst_rew_bonus_eval) + 2 + policy_output_params * act_dim + self._mem_out_size
+        self._traj_in_dim = np.ndim(KG_task_env.observation_space) + np.ndim(KG_task_env.action_space) + len(
+            self.lst_rew_bonus_eval) + 2 + policy_output_params * np.ndim(KG_task_env.action_space) + self._mem_out_size
 
         self._loss = Conv1DLoss(traj_dim_in=self._traj_in_dim)
-        self._traj_norm = Normalizer((observation_dim + action_dim + len(self.lst_rew_bonus_eval) + 2,))
+        self._traj_norm = Normalizer((np.ndim(KG_task_env.observation_space) + np.ndim(KG_task_env.action_space) + len(self.lst_rew_bonus_eval) + 2,))
 
     @property
     def backprop_params(self):
@@ -162,7 +162,7 @@ class GenericAgent(object):
         epg_surr_loss = self._loss.loss(loss_inputs)
         return epg_surr_loss
 
-     def compute_ppo_loss(self, obs, acts, at, vt, old_params):
+    def compute_ppo_loss(self, obs, acts, at, vt, old_params):
         params = self.pi_f(obs)
         critic_value = F.flatten(self.critic_value(obs))
         ratio = torch.exp(self._logp(params, acts) - self._logp(old_params, acts))
@@ -171,9 +171,9 @@ class GenericAgent(object):
         ppo_surr_loss = (
                 -sym_mean(torch.minimum(surr1, surr2))
                 + self._ppo_klcoeff * sym_mean(self.kl(old_params, params))
-                + sym_mean(F.square(cv - vt))
+                + sym_mean(F.square(critic_value - vt))
         )
-        return policy_loss
+        return ppo_surr_loss
 
 
     def epg_update(self, obs, acts, rews, dones, ppo_factor, inner_opt_freq):
@@ -228,7 +228,7 @@ class GenericAgent(object):
             for idx in np.array_split(np.random.permutation(n), n // self.inner_opt_batch_size):
                 # Clear gradients
                 for v in self.backprop_params:
-                    optimizer.zero_grad()
+                    v.zero_grad()
 
                 # Forward pass through loss function.
                 # Apply temporal conv to input trajectory
@@ -286,11 +286,11 @@ class ContinuousGenericAgent(GenericAgent):
         return super(ContinuousGenericAgent, self).backprop_params + self._pi.train_vars + [self._logstd]
 
     def pi_f(self, x):
-        mean,std = policy.prob_parameters(x)##already gives the standard deviation so no need of epsilon 
+        mean,std = self.pi.prob_parameters(x)##already gives the standard deviation so no need of epsilon 
         return mean,std
 
     def pi_logp(self, obs, acts):
-        log_prob = policy.log_prob(obs,acts)
+        log_prob = self.pi.log_prob(obs,acts)
 
     def logp(self, params, acts):
         mean, logstd = params
@@ -326,7 +326,7 @@ class ContinuousGenericAgent(GenericAgent):
 class DiscreteGenericAgent(GenericAgent):
     def __init__(self, env_dim, act_dim, policy, inner_lr=None, **kwargs):
         assert inner_lr is not None
-        assert policy = CategoricalPolicy
+        assert policy == CategoricalPolicy
         super().__init__(env_dim, act_dim, 1, **kwargs)
         self.pi = policy ## take categorical Policy
          ## select optimizer outside for policy
@@ -338,16 +338,16 @@ class DiscreteGenericAgent(GenericAgent):
         return super(DiscreteGenericAgent, self).backprop_params + self.pi.parameters()
 
     def pi_f(self, x):
-        return policy.prob_parameters(x)
+        return self.pi.prob_parameters(x)
 
     def pi_logp(self, obs, acts):
-        log_prob,actions = policy.forward(obs)
+        log_prob,actions = self.pi.forward(obs)
         return log_prob
 
     def logp(self, params, acts):
         loc = params[0]
         density = Categorical(logits=loc)
-        log_prob = density.log_prob(action).mean().view(-1, 1).detach()
+        log_prob = density.log_prob(acts).mean().view(-1, 1).detach()
         return log_prob
 
     def act(self, obs):
@@ -359,7 +359,7 @@ class DiscreteGenericAgent(GenericAgent):
         # Normalize!
         obs = self._traj_norm.norm(traj)[:self._env_dim]
         prob = self.pi_f(obs[np.newaxis,]).detach()
-        log_prob,actions = policy.forward(obs[np.newaxis,])
+        log_prob,actions = self.pi.forward(obs[np.newaxis,])
         return actions
 
     def kl(self, params0, params1):

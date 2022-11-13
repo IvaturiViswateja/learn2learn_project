@@ -1,10 +1,14 @@
-import chainer as C
-import chainer.functions as F
-import chainer.links as L
 import numpy as np
+# import chainer as C
+import torch
+# import chainer.links as L
+import pytorch_pfn_extras as ppe
+# import chainer.functions as F
+import torch.nn.functional as F
 
 
-class Loss(C.Chain):
+# class Loss(C.Chain):
+class Loss(torch.nn.Module):
     """This is the loss optimized by the EPG inner loop agent.
     """
 
@@ -46,13 +50,20 @@ class Conv1DLoss(Loss):
         # This means, 1 input dimension (so we convolve along the temporal axis) and treat
         # each feature dimension as a channel. The temporal axis is always the same length
         # since this is fixed with a buffer that keeps track of the latest data.
-        traj_c0 = L.ConvolutionND(
+        # traj_c0 = L.ConvolutionND(
+        #     ndim=1, in_channels=traj_dim_in, out_channels=chan_traj_c0_c1, ksize=6, stride=5)
+        # traj_c1 = L.ConvolutionND(
+        #     ndim=1, in_channels=chan_traj_c0_c1, out_channels=chan_traj_c1_d0, ksize=4, stride=2)
+        traj_c0 = ppe.nn.LazyConv1d(
             ndim=1, in_channels=traj_dim_in, out_channels=chan_traj_c0_c1, ksize=6, stride=5)
-        traj_c1 = L.ConvolutionND(
+        traj_c1 = ppe.nn.LazyConv1d(
             ndim=1, in_channels=chan_traj_c0_c1, out_channels=chan_traj_c1_d0, ksize=4, stride=2)
-        traj_d0 = L.Linear(in_size=chan_traj_c1_d0, out_size=units_traj_d0_d1)
-        loss_d0 = L.Linear(in_size=traj_dim_in + units_traj_d0_d1, out_size=units_traj_d1_d2)
-        loss_d1 = L.Linear(in_size=units_traj_d1_d2, out_size=1)
+        # traj_d0 = L.Linear(in_size=chan_traj_c1_d0, out_size=units_traj_d0_d1)
+        # loss_d0 = L.Linear(in_size=traj_dim_in + units_traj_d0_d1, out_size=units_traj_d1_d2)
+        # loss_d1 = L.Linear(in_size=units_traj_d1_d2, out_size=1)
+        traj_d0 = ppe.nn.LazyLinear(in_size=chan_traj_c1_d0, out_size=units_traj_d0_d1)
+        loss_d0 = ppe.nn.LazyLinear(in_size=traj_dim_in + units_traj_d0_d1, out_size=units_traj_d1_d2)
+        loss_d1 = ppe.nn.LazyLinear(in_size=units_traj_d1_d2, out_size=1)
 
         Loss.__init__(self,
                       # trajectory processing
@@ -66,16 +77,21 @@ class Conv1DLoss(Loss):
         shp = l.shape[0]
         # First dim is batchsize=1, then either 1 channel for 2d conv or n_feat channels
         # for 1d conv.
-        l = F.expand_dims(l, axis=0)
-        l = F.transpose(l, (0, 2, 1))
+        # l = F.expand_dims(l, axis=0) 
+        l = torch.unsqueeze(l, axis=0) 
+        # l = F.transpose(l, (0, 2, 1))
+        l = torch.permute(l, (0, 2, 1))
         l = self.traj_c0(l)
         l = F.leaky_relu(l)
         l = self.traj_c1(l)
         l = F.leaky_relu(l)
-        l = F.sum(l, axis=(0, 2)) / l.shape[0] / l.shape[2]
-        l = F.expand_dims(l, axis=0)
+        # l = F.sum(l, axis=(0, 2)) / l.shape[0] / l.shape[2]
+        l = torch.sum(l, axis=(0, 2)) / l.shape[0] / l.shape[2]
+        # l = F.expand_dims(l, axis=0)
+        l = torch.unsqueeze(l, axis=0)
         l = self.traj_d0(l)
-        l = F.tile(l, (shp, 1))
+        # l = F.tile(l, (shp, 1))
+        l = torch.tile(l, (shp, 1))
         return l
 
     def loss(self, l):
@@ -89,5 +105,6 @@ class Conv1DLoss(Loss):
         # Need to put this otherwise error with BLAS ...
         l = l[:]
         # Average accross minibatch
-        l = F.sum(l) / l.size
+        # l = F.sum(l) / l.size
+        l = torch.sum(l) / l.size
         return l

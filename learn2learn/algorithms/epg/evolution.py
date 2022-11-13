@@ -1,24 +1,23 @@
 import matplotlib
 import torch 
 from torch import optim
-matplotlib.use('Agg')
 import os
 import gym
 import time
-
+from pathos.multiprocessing import ProcessPool
+from mpi4py import MPI
 import numpy as np
 from epg.launching import logger
 from epg import utils
 from epg import plotting
 from epg.utils import PiecewiseSchedule
-from mpi4py import MPI
-
 from epg.losses import Conv1DLoss
 from epg.utils import reseed, get_dims, Adam, relative_ranks
 from epg.agents import DiscreteGenericAgent, ContinuousGenericAgent
 from epg.rollout import run_batch_rl
 
 gym.logger.set_level(41)
+matplotlib.use('Agg')
 
 # Statics
 NUM_EQUAL_NOISE_VECTORS = 1
@@ -32,11 +31,8 @@ class ES(object):
     def __init__(self,env, inner_opt_freq=None, inner_max_n_epoch=None, inner_opt_batch_size=None,
                  inner_buffer_size=None, inner_n_opt_steps=None, inner_lr=None, inner_use_ppo=None,
                  plot_freq=10, gpi=None, mem=None, **_):
-      
-        
         self._outer_plot_freq = plot_freq
         self._outer_evolve_policy_init = gpi
-
         self._inner_use_mem = mem
         self._inner_opt_freq = inner_opt_freq
         self._inner_opt_batch_size = inner_opt_batch_size
@@ -57,7 +53,7 @@ class ES(object):
         else:
             agent_cls = ContinuousGenericAgent
         agent = agent_cls(
-                 policy_output_params,
+                 env_dim, act_dim,
                  memory_out_size=None, 
                  inner_n_opt_steps=None, 
                  inner_opt_batch_size=None,
@@ -154,7 +150,6 @@ class ES(object):
 
         # Set up intra-machine parallelization.
         logger.log('Using {} proceses per MPI process.'.format(n_cpu))
-        from pathos.multiprocessing import ProcessPool
         pool = ProcessPool(nodes=n_cpu)
 
         begin_time, best_test_return = time.time(), -np.inf
