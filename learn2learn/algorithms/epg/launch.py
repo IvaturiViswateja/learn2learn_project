@@ -1,13 +1,6 @@
 #!/usr/bin/env python3
 
-"""
-Trains a 2-layer MLP with MetaSGD-VPG.
-Usage:
-python examples/rl/maml_trpo.py
-"""
-
 import random
-
 import cherry as ch
 import gym
 import learn2learn as l2l
