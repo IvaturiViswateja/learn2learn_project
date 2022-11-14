@@ -1,20 +1,25 @@
 #!/usr/bin/env python3
+import sys
+sys.path.append('C:\\NSR\\gym\\gym\\envs\\KG_env')
+sys.path.append('C:\\NSR\\learn2learn_project\\learn2learn\\gym\\envs')
+sys.path.append('C:\\NSR\\learn2learn_project\\learn2learn\\algorithms\\epg')
+
 
 import random
 import gym
 import numpy as np
 # from gym.envs import KG_env
-from gym.envs.KG_env import Knowledgegraph_gym
 from gym.error import DependencyNotInstalled
-from learn2learn.gym.envs.meta_env import MetaEnv
+from env import Knowledgegraph_gym
+from meta_env import MetaEnv
 from utils import *
 
-dataPath = '....nell-995.....'
+dataPath = 'C:\\NSR\\NELL-995\\'
 
 class KG_task_env(MetaEnv,Knowledgegraph_gym):
     def __init__(self, task_meta = None):
         Knowledgegraph_gym.__init__(self,dataPath)
-        MetaEnv.__init__(self, task)
+        MetaEnv.__init__(self, task_meta)
 
     # -------- MetaEnv Methods --------
     def set_task(self, task):

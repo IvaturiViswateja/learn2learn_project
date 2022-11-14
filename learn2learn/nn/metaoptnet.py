@@ -4,7 +4,7 @@ import torch
 try:
     from qpth.qp import QPFunction
 except ImportError:
-    from learn2learn.utils import _ImportRaiser
+    from learn2learn_project.learn2learn.utils import _ImportRaiser
     QPFunction = _ImportRaiser('qpth', 'pip install qpth')
 
 EPS = 1e-8

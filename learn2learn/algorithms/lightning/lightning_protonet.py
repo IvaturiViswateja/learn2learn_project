@@ -6,9 +6,9 @@ import numpy as np
 import torch
 
 from torch import nn
-from learn2learn.utils import accuracy
-from learn2learn.nn import PrototypicalClassifier
-from learn2learn.algorithms.lightning import LightningEpisodicModule
+from learn2learn_project.learn2learn.utils import accuracy
+from learn2learn_project.learn2learn.nn import PrototypicalClassifier
+from learn2learn_project.learn2learn.algorithms.lightning import LightningEpisodicModule
 
 
 class LightningPrototypicalNetworks(LightningEpisodicModule):

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
+import sys
+sys.path.append('C:\\NSR\\learn2learn_project\\learn2learn\\gym\\envs')
 
 import numpy as np
 from gym import spaces
 from gym.utils import seeding
 
-from learn2learn.gym.envs.meta_env import MetaEnv
+from meta_env import MetaEnv
 
 
 class Particles2DEnv(MetaEnv):

@@ -1,5 +1,4 @@
 import matplotlib
-import torch 
 from torch import optim
 import os
 import gym
@@ -7,14 +6,14 @@ import time
 from pathos.multiprocessing import ProcessPool
 from mpi4py import MPI
 import numpy as np
-from epg.launching import logger
-from epg import utils
-from epg import plotting
-from epg.utils import PiecewiseSchedule
-from epg.losses import Conv1DLoss
-from epg.utils import reseed, get_dims, Adam, relative_ranks
-from epg.agents import DiscreteGenericAgent, ContinuousGenericAgent
-from epg.rollout import run_batch_rl
+from launching import logger
+import utils
+# from epg import plotting
+from utils import PiecewiseSchedule
+from losses import Conv1DLoss
+from utils import reseed, get_dims, Adam, relative_ranks
+from base_epg_learner import DiscreteGenericAgent, ContinuousGenericAgent
+from rollout import run_batch_rl
 
 gym.logger.set_level(41)
 matplotlib.use('Agg')
@@ -229,7 +228,7 @@ class ES(object):
                         theta[np.newaxis, :] + np.zeros((NUM_TEST_SAMPLES, num_params)),
                         range(NUM_TEST_SAMPLES)
                     ).get()
-                    plotting.plot_results(epoch, test_results)
+                    # plotting.plot_results(epoch, test_results)
                     test_return = np.mean([utils.ret_to_obj(r['ep_return']) for r in test_results])
                     if test_return > best_test_return:
                         best_test_return = test_return

@@ -6,7 +6,7 @@
 try:
     from pytorch_lightning import LightningModule
 except ImportError:
-    from learn2learn.utils import _ImportRaiser
+    from learn2learn_project.learn2learn.utils import _ImportRaiser
 
     class LightningRaiser(_ImportRaiser):
 

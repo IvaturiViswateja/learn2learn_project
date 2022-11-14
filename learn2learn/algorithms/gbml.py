@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import torch
-import learn2learn as l2l
+import learn2learn_project.learn2learn as l2l
 
 
 class GBML(torch.nn.Module):

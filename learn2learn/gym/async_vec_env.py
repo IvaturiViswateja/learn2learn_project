@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
+import sys
+sys.path.append('C:\\NSR\\learn2learn_project\\learn2learn\\gym\\envs\\.py')
 
 import multiprocessing as mp
-
-from .envs import SubprocVecEnv
+from subproc_vec_env import SubprocVecEnv
 
 
 class AsyncVectorEnv(SubprocVecEnv):

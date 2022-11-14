@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
+import sys
+sys.path.append('C:\\NSR\\gym\\gym\\envs')
 
-from gym.envs.registration import register
-
+from registration import register
 from .subproc_vec_env import SubprocVecEnv
 
 # 2D Navigation

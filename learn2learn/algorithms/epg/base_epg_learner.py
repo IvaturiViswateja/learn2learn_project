@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+import sys
+sys.path.append('C:\\NSR\\learn2learn_project\\learn2learn\\common')
+sys.path.append('C:\\NSR\\learn2learn_project\\learn2learn\\gym\\envs\\Knowledge_graphs')
+
 import math
 import torch 
 import torch.nn.functional as F
@@ -6,23 +10,17 @@ import traceback
 from torch.autograd import grad
 from torch.distributions import Normal, Categorical
 from torch import optim
-import chainer as C
-import chainer.functions as F
+# import chainer as C
+# import chainer.functions as F
 import numpy as np
 from mpi4py import MPI
-from epg.launching import logger
-from epg.exploration import HashingBonusEvaluator
-from epg.losses import Conv1DLoss
-from epg.networks import Memory
-from epg.utils import sym_mean, gamma_expand, int_to_onehot, onehot_to_int, \
-    Adam, Normalizer, gaussian_kl, categorical_kl
-from learn2learn.algorithms.base_learner import BaseLearner
-from learn2learn.utils import clone_module, update_module
-from learn2learn.algorithms.epg.losses import *
-from learn2learn.algorithms.epg.networks import Memory 
-from learn2learn.algorithms.epg.utils import *
-from learn2learn.common.policies import DiagNormalPolicy,CategoricalPolicy
-from learn2learn.gym.envs.Knowledge_graphs import KG_task_env
+from launching import logger
+from exploration import HashingBonusEvaluator
+from losses import *
+from networks import *
+from utils import *
+from policies import DiagNormalPolicy,CategoricalPolicy
+from KG_env import KG_task_env
 
 ## these are neural networks which gives the required policies 
 

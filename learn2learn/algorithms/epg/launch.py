@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
+import sys
+sys.path.append('C:\\NSR\\learn2learn_project\\learn2learn\\common')
+sys.path.append('C:\\NSR\\learn2learn_project\\learn2learn\\gym')
 
 import random
-#import cherry as ch
+import cherry as ch
 import gym
-import learn2learn as l2l
+# import learn2learn as l2l
 import numpy as np
-import torch
-# from cherry.algorithms import a2c
-#from cherry.models.robotics import LinearValue
-from l2l.algorithms.epg.evolution import ES
-from l2l.common.policies import CategoricalPolicy
-from mpi4py import MPI
 from torch import optim
+import torch
+from mpi4py import MPI
+# from cherry.algorithms import a2c
+# from cherry.models.robotics import LinearValue
+# from learn2learn.algorithms.epg.evolution import ES
+from evolution import ES
+from async_vec_env import AsyncVectorEnv
+from policies import CategoricalPolicy
 from tqdm import tqdm
 
 
@@ -36,9 +41,9 @@ def main(
     def make_env():
         return gym.make(env_name)
 
-    env = l2l.gym.AsyncVectorEnv([make_env for _ in range(num_workers)])
+    env = AsyncVectorEnv([make_env for _ in range(num_workers)])
     env.seed(seed)
-    #env = ch.envs.Torch(env)
+    env = ch.envs.Torch(env)
     policy = CategoricalPolicy(env.state_size, env.action_size)
     #baseline = LinearValue(env.state_size, env.action_size)
     es = ES(env,inner_opt_freq=None, inner_max_n_epoch=None, inner_opt_batch_size=None,

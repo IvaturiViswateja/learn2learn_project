@@ -2,10 +2,10 @@
 
 import numpy as np
 import torch
-import learn2learn as l2l
+import learn2learn_project.learn2learn as l2l
 
-from learn2learn.utils import accuracy
-from learn2learn.algorithms.lightning import (
+from learn2learn_project.learn2learn.utils import accuracy
+from learn2learn_project.learn2learn.algorithms.lightning import (
     LightningEpisodicModule,
     LightningMAML,
 )

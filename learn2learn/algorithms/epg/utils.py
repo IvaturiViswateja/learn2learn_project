@@ -1,6 +1,7 @@
 import random
 import time
-import chainer.functions as F
+# import chainer.functions as F
+import torch
 import gym
 import numpy as np
 
@@ -12,7 +13,7 @@ def reseed(env, pool_rank):
 
 
 def sym_mean(x):
-    return F.sum(x) / x.size
+    return torch.sum(x) / x.size
 
 
 def gamma_expand(x, a):
@@ -105,9 +106,9 @@ class Normalizer(object):
 def gaussian_kl(params0, params1):
     (mean0, logstd0), (mean1, logstd1) = params0, params1
     assert mean0.shape == logstd0.shape == mean1.shape == logstd1.shape
-    return F.sum(
-        logstd1 - logstd0 + (F.square(F.exp(logstd0)) + F.square(mean0 - mean1)) / (
-                2.0 * F.square(F.exp(logstd1))) - 0.5,
+    return torch.sum(
+        logstd1 - logstd0 + (torch.square(torch.exp(logstd0)) + torch.square(mean0 - mean1)) / (
+                2.0 * torch.square(torch.exp(logstd1))) - 0.5,
         axis=1
     )
 
@@ -116,14 +117,14 @@ def categorical_kl(params0, params1):
     params0 = params0[0]
     params1 = params1[0]
     assert params0.shape == params1.shape
-    a0 = params0 - F.tile(F.max(params0, axis=1, keepdims=True), (1, 4))
-    a1 = params1 - F.tile(F.max(params1, axis=1, keepdims=True), (1, 4))
-    ea0 = F.exp(a0)
-    ea1 = F.exp(a1)
-    z0 = F.tile(F.sum(ea0, axis=1, keepdims=True), (1, 4))
-    z1 = F.tile(F.sum(ea1, axis=1, keepdims=True), (1, 4))
+    a0 = params0 - torch.tile(torch.max(params0, axis=1, keepdims=True), (1, 4))
+    a1 = params1 - torch.tile(torch.max(params1, axis=1, keepdims=True), (1, 4))
+    ea0 = torch.exp(a0)
+    ea1 = torch.exp(a1)
+    z0 = torch.tile(torch.sum(ea0, axis=1, keepdims=True), (1, 4))
+    z1 = torch.tile(torch.sum(ea1, axis=1, keepdims=True), (1, 4))
     p0 = ea0 / z0
-    return F.sum(p0 * (a0 - F.log(z0) - a1 + F.log(z1)), axis=1)
+    return torch.sum(p0 * (a0 - torch.log(z0) - a1 + torch.log(z1)), axis=1)
 
 
 def log_misc_stats(key, logger, lst_value):

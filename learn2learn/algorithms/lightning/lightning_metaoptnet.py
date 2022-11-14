@@ -3,9 +3,9 @@
 import numpy as np
 import torch
 
-from learn2learn.utils import accuracy
-from learn2learn.nn import SVClassifier
-from learn2learn.algorithms.lightning import (
+from learn2learn_project.learn2learn.utils import accuracy
+from learn2learn_project.learn2learn.nn import SVClassifier
+from learn2learn_project.learn2learn.algorithms.lightning import (
     LightningEpisodicModule,
     LightningPrototypicalNetworks,
 )
