@@ -5,13 +5,20 @@ sys.path.append('C:\\NSR\\gym\\gym\\envs')
 from registration import register
 from .subproc_vec_env import SubprocVecEnv
 
+# KG_env
+# ----------------------------------------
+register(
+    id="KG_task-v1",
+    entry_point="learn2learn.gym.envs.Knowledge_graphs.KG_env:KG_task_env",
+    max_episode_steps=1000,
+)
 # 2D Navigation
 # ----------------------------------------
 
 register(
     'Particles2D-v1',
     entry_point='learn2learn.gym.envs.particles.particles_2d:Particles2DEnv',
-    max_episode_steps=100
+    max_episode_steps=100,
 )
 
 # Mujoco

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import sys
-sys.path.append('C:\\NSR\\gym\\gym\\envs\\KG_env')
+sys.path.append('C:\\NSR\\DeepPath_GYM\\scripts')
 sys.path.append('C:\\NSR\\learn2learn_project\\learn2learn\\gym\\envs')
 sys.path.append('C:\\NSR\\learn2learn_project\\learn2learn\\algorithms\\epg')
 

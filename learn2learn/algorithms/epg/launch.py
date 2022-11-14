@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 def main(
         experiment='dev',
-        env_name='Particles2D-v1',
+        env_name='KG_task-v1',
         adapt_lr=0.1,
         meta_lr=0.01,
         adapt_steps=1,
