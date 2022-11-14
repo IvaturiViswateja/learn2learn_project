@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 import random
-import cherry as ch
+#import cherry as ch
 import gym
 import learn2learn as l2l
 import numpy as np
 import torch
-from cherry.algorithms import a2c
-from cherry.models.robotics import LinearValue
+# from cherry.algorithms import a2c
+#from cherry.models.robotics import LinearValue
 from l2l.algorithms.epg.evolution import ES
 from l2l.common.policies import CategoricalPolicy
 from mpi4py import MPI
@@ -38,9 +38,9 @@ def main(
 
     env = l2l.gym.AsyncVectorEnv([make_env for _ in range(num_workers)])
     env.seed(seed)
-    env = ch.envs.Torch(env)
+    #env = ch.envs.Torch(env)
     policy = CategoricalPolicy(env.state_size, env.action_size)
-    baseline = LinearValue(env.state_size, env.action_size)
+    #baseline = LinearValue(env.state_size, env.action_size)
     es = ES(env,inner_opt_freq=None, inner_max_n_epoch=None, inner_opt_batch_size=None,
             inner_buffer_size=None, inner_n_opt_steps=None, inner_lr=None, inner_use_ppo=None,
             plot_freq=10, gpi=None, mem=None)
